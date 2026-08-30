@@ -1,0 +1,52 @@
+# macOS
+.DS_Store
+
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+
+# Java / Maven
+target/
+*.class
+
+# Node / React
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+
+# Playwright / frontend test output
+playwright-report/
+test-results/
+
+# Logs
+*.log
+logs/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Local database volumes and generated runtime data
+.data/
+data/
+tmp/
+
+# Local course drafts and generated teaching artifacts
+docs/labs/
+docs/lab-notes/
+docs/examples/
+docs/archive/
+autograders/
+
+# Python helper scripts
+__pycache__/
+*.py[cod]
+
+# OS/editor swap files
+*.swp
+*.swo
+*~

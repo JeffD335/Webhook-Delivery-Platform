@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: webhook-delivery-platform
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/webhook_platform}
+    username: ${DATABASE_USERNAME:webhook}
+    password: ${DATABASE_PASSWORD:webhook}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    validate-migration-naming: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+server:
+  port: ${SERVER_PORT:8080}
+
+webhook:
+  delivery:
+    worker-id: ${WEBHOOK_DELIVERY_WORKER_ID:worker-1}
+    worker-count: ${WEBHOOK_DELIVERY_WORKER_COUNT:3}
+    manual-runner:
+      enabled: ${WEBHOOK_DELIVERY_MANUAL_RUNNER_ENABLED:true}
+    scheduler:
+      enabled: ${WEBHOOK_DELIVERY_SCHEDULER_ENABLED:true}
+      fixed-delay-ms: ${WEBHOOK_DELIVERY_SCHEDULER_FIXED_DELAY_MS:1000}
