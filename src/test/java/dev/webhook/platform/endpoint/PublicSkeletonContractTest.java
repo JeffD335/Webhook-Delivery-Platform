@@ -29,7 +29,7 @@ class PublicSkeletonContractTest {
         Instant createdAt = Instant.parse("2026-07-07T08:00:00Z");
 
         EndpointResponse response = new EndpointResponse(
-                id, "receiver", "https://example.com/hook", createdAt);
+                id, "receiver", "https://example.com/hook", createdAt, true);
 
         assertThat(response.id()).isEqualTo(id);
         assertThat(response.name()).isEqualTo("receiver");

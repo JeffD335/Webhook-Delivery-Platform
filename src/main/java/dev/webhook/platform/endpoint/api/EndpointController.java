@@ -7,16 +7,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-/**
- * Fixed HTTP boundary for Lab 1. Implement each method at its owning checkpoint.
- */
 @RestController
 @RequestMapping("/api/endpoints")
 public class EndpointController {
@@ -42,5 +34,10 @@ public class EndpointController {
     @GetMapping
     public List<EndpointResponse> list() {
         return endpointService.list();
+    }
+
+    @PatchMapping("/{id}/enabled")
+    public EndpointResponse setEnabled(@PathVariable UUID id, @RequestBody UpdateEndpointEnabledRequest request) {
+        return endpointService.setEnabled(id, request.enabled());
     }
 }

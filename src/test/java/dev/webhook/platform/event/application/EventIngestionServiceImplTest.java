@@ -61,7 +61,7 @@ class EventIngestionServiceImplTest {
                 }
                 """);
 
-        when(endpointRepository.findAll()).thenReturn(List.of());
+        when(endpointRepository.findAllByEnabledTrue()).thenReturn(List.of());
         when(deliveryPlanner.plan(anyList())).thenReturn(List.of());
         when(eventRepository.save(any(EventEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(deliveryRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));

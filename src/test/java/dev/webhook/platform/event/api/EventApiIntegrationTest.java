@@ -9,10 +9,12 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -29,6 +31,35 @@ class EventApiIntegrationTest extends ApiIntegrationTestSupport {
     @BeforeEach
     void clearDatabase() {
         clearWebhookTables();
+    }
+
+    @Test
+    void createEvent_whenEndpointIsDisabled_skipsDisabledEndpoint() throws Exception {
+        UUID endpointId = createEndpointAndReadId("Test Disabled Endpoint", "https://receiver.example/webhook");
+
+        mockMvc.perform(patch("/api/endpoints/{id}/enabled", endpointId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                        """
+                        {
+                            "enabled": false
+                        }
+                        """
+                )).andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
+
+        postEvent("test.type",
+                """
+                        {
+                            "message": "Test payload"
+                        }
+                        """
+        )
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.deliveryCount").value(0));
+
+        assertThat(countRows("webhook_events")).isEqualTo(1);
+        assertThat(countRows("webhook_deliveries")).isZero();
     }
 
     @Test

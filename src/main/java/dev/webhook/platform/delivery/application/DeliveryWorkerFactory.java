@@ -2,6 +2,7 @@ package dev.webhook.platform.delivery.application;
 
 import dev.webhook.platform.delivery.claim.DeliveryClaimer;
 import dev.webhook.platform.delivery.domain.RetryPolicy;
+import dev.webhook.platform.delivery.observability.DeliveryMetrics;
 import dev.webhook.platform.delivery.persistence.DeliveryAttemptRepository;
 import dev.webhook.platform.delivery.persistence.DeliveryRepository;
 import dev.webhook.platform.delivery.sender.WebhookSender;
@@ -21,6 +22,7 @@ public class DeliveryWorkerFactory {
     private final ObjectProvider<WebhookSender> webhookSenderProvider;
     private final RetryPolicy retryPolicy;
     private final DeliveryClaimer deliveryClaimer;
+    private final DeliveryMetrics deliveryMetrics;
 
     public DeliveryWorkerFactory(
             DeliveryRepository deliveryRepository,
@@ -29,7 +31,8 @@ public class DeliveryWorkerFactory {
             EndpointRepository endpointRepository,
             ObjectProvider<WebhookSender> webhookSenderProvider,
             RetryPolicy retryPolicy,
-            DeliveryClaimer deliveryClaimer) {
+            DeliveryClaimer deliveryClaimer,
+            DeliveryMetrics deliveryMetrics) {
         this.deliveryRepository = Objects.requireNonNull(deliveryRepository);
         this.deliveryAttemptRepository = Objects.requireNonNull(deliveryAttemptRepository);
         this.eventRepository = Objects.requireNonNull(eventRepository);
@@ -37,6 +40,7 @@ public class DeliveryWorkerFactory {
         this.webhookSenderProvider = Objects.requireNonNull(webhookSenderProvider);
         this.retryPolicy = Objects.requireNonNull(retryPolicy);
         this.deliveryClaimer = Objects.requireNonNull(deliveryClaimer);
+        this.deliveryMetrics = Objects.requireNonNull(deliveryMetrics);
     }
 
     public DeliveryWorker create(String workerId) {
@@ -54,6 +58,7 @@ public class DeliveryWorkerFactory {
                 endpointRepository,
                 webhookSender,
                 retryPolicy,
-                deliveryClaimer);
+                deliveryClaimer,
+                deliveryMetrics);
     }
 }

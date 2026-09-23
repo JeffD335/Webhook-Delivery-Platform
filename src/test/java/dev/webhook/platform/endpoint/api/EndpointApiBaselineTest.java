@@ -3,6 +3,7 @@ package dev.webhook.platform.endpoint.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,6 +17,8 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+import lombok.val;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +65,7 @@ class EndpointApiBaselineTest {
                 .andExpect(jsonPath("$.name").value("Order Service"))
                 .andExpect(jsonPath("$.url").value("https://example.com/webhooks/orders"))
                 .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.enabled").value(true))
                 .andReturn();
 
         JsonNode body = responseBody(result);
@@ -76,6 +80,7 @@ class EndpointApiBaselineTest {
         assertThat(saved.getName()).isEqualTo("Order Service");
         assertThat(saved.getUrl()).isEqualTo("https://example.com/webhooks/orders");
         assertThat(saved.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(saved.isEnabled()).isTrue();
     }
 
     @Test
@@ -161,6 +166,35 @@ class EndpointApiBaselineTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ENDPOINT_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Endpoint does not exist"));
+    }
+
+    @Test
+    void setEnabledToFalse_whenEndpointExists_updatesAndReturnsEndpoint() throws Exception {
+        MvcResult endpoint = createEndpoint("Taobao", "https://www.taobao.com")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andReturn();
+        JsonNode created = responseBody(endpoint);
+        UUID id = UUID.fromString(created.get("id").asText());
+        assertThat(repository.findById(id).orElseThrow().isEnabled()).isTrue();
+
+        mockMvc.perform(patch("/api/endpoints/{id}/enabled", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"enabled": false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.name").value("Taobao"))
+                .andExpect(jsonPath("$.url").value("https://www.taobao.com"))
+                .andExpect(jsonPath("$.createdAt").value(created.get("createdAt").asText()))
+                .andExpect(jsonPath("$.enabled").value(false));
+
+        EndpointEntity updated = repository.findById(id).orElseThrow();
+        assertThat(updated.isEnabled()).isFalse();
+        assertThat(updated.getName()).isEqualTo("Taobao");
+        assertThat(updated.getUrl()).isEqualTo("https://www.taobao.com");
+        assertThat(repository.count()).isEqualTo(1);
     }
 
     private org.springframework.test.web.servlet.ResultActions createEndpoint(String name, String url) throws Exception {

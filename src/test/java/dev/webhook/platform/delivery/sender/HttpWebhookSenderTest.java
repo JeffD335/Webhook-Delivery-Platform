@@ -8,6 +8,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,6 +21,28 @@ class HttpWebhookSenderTest {
                     .connectTimeout(Duration.ofMillis(100))
                     .build(),
             Duration.ofMillis(300));
+
+    @ExtendWith(OutputCaptureExtension.class)
+    @Test
+    void send_whenUrlContainsToken_doesNotLogUrlOrPayload(
+            CapturedOutput output) throws IOException {
+        String token = "secret-test-value";
+        String payload = "{\"private\":\"sensitive-payload-value\"}";
+        HttpServer server = startServer(
+                204, new AtomicReference<>(), new AtomicReference<>());
+        String endpointUrl = url(server) + "?token=" + token;
+
+        try {
+            SendResult result = sender.send(endpointUrl, payload);
+
+            assertThat(result.succeeded()).isTrue();
+            assertThat(output.getAll())
+                    .doesNotContain(endpointUrl, token, payload);
+        } finally {
+            server.stop(0);
+        }
+    }
+
 
     @Test
     void twoHundredResponse_returnsSuccess() throws IOException {
@@ -57,14 +82,27 @@ class HttpWebhookSenderTest {
     @Test
     void networkFailure_returnsFailureWithoutHttpStatus() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        String url = url(server);
+        String url = url(server) + "?token=secret-test-value";
         server.stop(0);
 
         SendResult result = sender.send(url, "{\"orderId\":\"ord_connection_failure\"}");
 
         assertThat(result.succeeded()).isFalse();
         assertThat(result.httpStatus()).isNull();
-        assertThat(result.errorMessage()).isNotBlank();
+        assertThat(result.errorMessage()).isIn("connection error", "request timed out");
+        assertThat(result.errorMessage()).doesNotContain("secret-test-value");
+    }
+
+    @Test
+    void invalidUrl_returnsControlledErrorWithoutToken() {
+        String url = "http://[invalid?token=secret-test-value";
+
+        SendResult result = sender.send(url, "{}");
+
+        assertThat(result.succeeded()).isFalse();
+        assertThat(result.httpStatus()).isNull();
+        assertThat(result.errorMessage()).isEqualTo("invalid endpoint URL");
+        assertThat(result.errorMessage()).doesNotContain("secret-test-value");
     }
 
     private HttpServer startServer(

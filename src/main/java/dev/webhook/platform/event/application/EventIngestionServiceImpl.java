@@ -49,7 +49,7 @@ public class EventIngestionServiceImpl implements EventIngestionService {
     @Transactional
     public EventResponse ingest(CreateEventRequest request) {
         validate((request));
-        List<EndpointEntity> endpoints = endpointRepository.findAll();
+        List<EndpointEntity> endpoints = endpointRepository.findAllByEnabledTrue();
         List<DeliveryPlan> deliveryPlans = deliveryPlanner.plan(endpoints);
         String payload = serializePayload(request.payload());
         UUID eventUuid = UUID.randomUUID();

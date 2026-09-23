@@ -1,16 +1,34 @@
-# React + Vite
+# Webhook Delivery Platform frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite operator UI for the local webhook delivery API.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Start the Spring Boot API on `http://localhost:8080`, then from this directory:
 
-## React Compiler
+```sh
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Open the URL printed by Vite. The development server proxies `/api` to port 8080. Without the API, the UI displays a connection error rather than sample data.
 
-## Expanding the ESLint configuration
+## Current UI
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Delivery list with status filters, search, pagination, manual refresh, and optional 10-second auto-refresh.
+- Delivery details with attempt history and error information.
+- Endpoint list with search, enabled status, and status filtering.
+- Create an endpoint or ingest an event through the API.
+
+The enabled status is currently read-only here. The backend's event planner still selects all endpoints, so offering an enable/disable action would imply a delivery behavior the backend does not yet enforce.
+
+## Checks
+
+```sh
+npm run lint
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+The browser tests use mocked API responses and do not create database records.

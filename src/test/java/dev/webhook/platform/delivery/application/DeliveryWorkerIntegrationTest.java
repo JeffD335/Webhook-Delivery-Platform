@@ -2,6 +2,7 @@ package dev.webhook.platform.delivery.application;
 
 import dev.webhook.platform.delivery.claim.DeliveryClaimer;
 import dev.webhook.platform.delivery.domain.RetryPolicy;
+import dev.webhook.platform.delivery.observability.DeliveryMetrics;
 import dev.webhook.platform.delivery.persistence.DeliveryAttemptRepository;
 import dev.webhook.platform.delivery.persistence.DeliveryRepository;
 import dev.webhook.platform.delivery.sender.SendResult;
@@ -9,6 +10,7 @@ import dev.webhook.platform.delivery.sender.WebhookSender;
 import dev.webhook.platform.endpoint.persistence.EndpointRepository;
 import dev.webhook.platform.event.persistence.EventRepository;
 import dev.webhook.platform.testsupport.ApiIntegrationTestSupport;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -134,7 +136,8 @@ class DeliveryWorkerIntegrationTest extends ApiIntegrationTestSupport {
                 endpointRepository,
                 sender,
                 new RetryPolicy(),
-                deliveryClaimer);
+                deliveryClaimer,
+                new DeliveryMetrics(new SimpleMeterRegistry()));
     }
 
     protected UUID insertEvent(String type, String payloadJson) {

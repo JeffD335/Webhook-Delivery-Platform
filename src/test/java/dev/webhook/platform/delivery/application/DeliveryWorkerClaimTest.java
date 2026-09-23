@@ -3,6 +3,7 @@ package dev.webhook.platform.delivery.application;
 import dev.webhook.platform.delivery.claim.DeliveryClaimer;
 import dev.webhook.platform.delivery.domain.DeliveryStatus;
 import dev.webhook.platform.delivery.domain.RetryPolicy;
+import dev.webhook.platform.delivery.observability.DeliveryMetrics;
 import dev.webhook.platform.delivery.persistence.DeliveryAttemptEntity;
 import dev.webhook.platform.delivery.persistence.DeliveryAttemptRepository;
 import dev.webhook.platform.delivery.persistence.DeliveryEntity;
@@ -13,6 +14,7 @@ import dev.webhook.platform.endpoint.persistence.EndpointEntity;
 import dev.webhook.platform.endpoint.persistence.EndpointRepository;
 import dev.webhook.platform.event.persistence.EventEntity;
 import dev.webhook.platform.event.persistence.EventRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -82,7 +84,8 @@ class DeliveryWorkerClaimTest {
                 endpointRepository,
                 webhookSender,
                 new RetryPolicy(),
-                deliveryClaimer);
+                deliveryClaimer,
+                new DeliveryMetrics(new SimpleMeterRegistry()));
 
         ProcessResult result = worker.processOne();
 

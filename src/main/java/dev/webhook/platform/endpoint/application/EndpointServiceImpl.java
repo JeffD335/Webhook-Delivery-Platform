@@ -8,7 +8,10 @@ import dev.webhook.platform.endpoint.persistence.EndpointEntity;
 import dev.webhook.platform.endpoint.persistence.EndpointRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+
+import lombok.val;
 import org.springframework.stereotype.Service;
 
 /**
@@ -62,12 +65,26 @@ public class EndpointServiceImpl implements EndpointService {
                 .toList();
     }
 
+    @Override
+    public EndpointResponse setEnabled(UUID id, boolean enabled) {
+        EndpointEntity endpoint = repository.findById(id)
+                .orElseThrow(() -> new NotFoundException(
+                        "ENDPOINT_NOT_FOUND",
+                        "Endpoint does not exist"
+                ));
+
+        endpoint.setEnabled(enabled);
+        EndpointEntity saved = repository.save(endpoint);
+        return toResponse(saved);
+    }
+
     private EndpointResponse toResponse(EndpointEntity endpoint) {
         return new EndpointResponse(
                 endpoint.getId(),
                 endpoint.getName(),
                 endpoint.getUrl(),
-                endpoint.getCreatedAt()
+                endpoint.getCreatedAt(),
+                endpoint.isEnabled()
         );
     }
 }

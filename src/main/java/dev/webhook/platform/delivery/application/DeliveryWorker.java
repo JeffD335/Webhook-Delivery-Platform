@@ -5,6 +5,7 @@ import dev.webhook.platform.delivery.domain.DeliveryAttemptStatus;
 import dev.webhook.platform.delivery.domain.FailureResult;
 import dev.webhook.platform.delivery.domain.RetryDecision;
 import dev.webhook.platform.delivery.domain.RetryPolicy;
+import dev.webhook.platform.delivery.observability.DeliveryMetrics;
 import dev.webhook.platform.delivery.persistence.DeliveryAttemptEntity;
 import dev.webhook.platform.delivery.persistence.DeliveryAttemptRepository;
 import dev.webhook.platform.delivery.persistence.DeliveryEntity;
@@ -33,6 +34,7 @@ public class DeliveryWorker {
 
     private final RetryPolicy retryPolicy;
     private final DeliveryClaimer deliveryClaimer;
+    private final DeliveryMetrics deliveryMetrics;
 
     public DeliveryWorker(
             String workerId,
@@ -42,7 +44,8 @@ public class DeliveryWorker {
             EndpointRepository endpointRepository,
             WebhookSender webhookSender,
             RetryPolicy retryPolicy,
-            DeliveryClaimer deliveryClaimer) {
+            DeliveryClaimer deliveryClaimer,
+            DeliveryMetrics deliveryMetrics) {
         this.workerId = Objects.requireNonNull(workerId);
         this.deliveryRepository = Objects.requireNonNull(deliveryRepository);
         this.deliveryAttemptRepository = Objects.requireNonNull(deliveryAttemptRepository);
@@ -51,9 +54,19 @@ public class DeliveryWorker {
         this.webhookSender = Objects.requireNonNull(webhookSender);
         this.retryPolicy = Objects.requireNonNull(retryPolicy);
         this.deliveryClaimer = Objects.requireNonNull(deliveryClaimer);
+        this.deliveryMetrics = Objects.requireNonNull(deliveryMetrics);
     }
 
     public ProcessResult processOne() {
+        try {
+            return processOneInternal();
+        } catch (RuntimeException failure) {
+            deliveryMetrics.recordWorkerError();
+            throw failure;
+        }
+    }
+
+    private ProcessResult processOneInternal() {
         Optional<DeliveryEntity> claimedDelivery = deliveryClaimer.claimNextDueDelivery(
                 workerId,
                 Instant.now(),
@@ -77,15 +90,19 @@ public class DeliveryWorker {
 
         delivery.recordAttemptStarted(Instant.now());
 
+        DeliveryMetrics.TimedSend timedSend =
+                deliveryMetrics.timeSend(() -> webhookSender.send(url, payload));
+        SendResult result = timedSend.result();
         log.info(
-                "worker sending delivery workerId={} deliveryId={} endpointId={} attempt={} url={}",
+                "webhook send completed workerId={} deliveryId={} eventId={} endpointId={} attempt={} result={} httpStatus={} durationMs={}",
                 workerId,
                 delivery.getId(),
+                delivery.getEventId(),
                 delivery.getEndpointId(),
                 attempt.getAttemptNumber(),
-                url);
-
-        SendResult result = webhookSender.send(url, payload);
+                timedSend.resultCategory(),
+                result.httpStatus(),
+                timedSend.durationMs());
 
         if (result.succeeded()) {
             return finishSuccess(delivery, attempt, result);
@@ -148,6 +165,8 @@ public class DeliveryWorker {
         delivery.markSucceeded();
         deliveryAttemptRepository.save(attempt);
 
+        deliveryRepository.save(delivery);
+
         log.info(
                 "worker delivery succeeded workerId={} deliveryId={} attempt={} httpStatus={}",
                 workerId,
@@ -155,14 +174,12 @@ public class DeliveryWorker {
                 attempt.getAttemptNumber(),
                 result.httpStatus());
 
-        deliveryRepository.save(delivery);
+        deliveryMetrics.recordTransitionSucceeded();
+
         return ProcessResult.succeeded(delivery.getId());
     }
 
-    private ProcessResult finishFailure(
-            DeliveryEntity delivery,
-            DeliveryAttemptEntity attempt,
-            SendResult result) {
+    private ProcessResult finishFailure(DeliveryEntity delivery, DeliveryAttemptEntity attempt, SendResult result) {
         attempt.markedFailed(result.httpStatus(), result.errorMessage());
         RetryDecision decision = retryPolicy.decideAfterFailure(
                 attempt.getAttemptNumber(),
@@ -170,31 +187,48 @@ public class DeliveryWorker {
                 Instant.now()
         );
 
-
-
         if (decision.shouldRetry()) {
-            log.warn(
-                    "worker delivery failed retry scheduled workerId={} deliveryId={} attempt={} httpStatus={} error={} nextAttemptAt={}",
-                    workerId,
-                    delivery.getId(),
-                    attempt.getAttemptNumber(),
-                    result.httpStatus(),
-                    result.errorMessage(),
-                    decision.nextAttemptAt());
             delivery.scheduleRetry(decision.nextAttemptAt(), result.errorMessage(), Instant.now());
         } else {
-            log.warn(
-                    "worker delivery failed permanently workerId={} deliveryId={} attempt={} httpStatus={} error={}",
-                    workerId,
-                    delivery.getId(),
-                    attempt.getAttemptNumber(),
-                    result.httpStatus(),
-                    result.errorMessage());
             delivery.markFailed(result.errorMessage(), Instant.now());
         }
 
         deliveryRepository.save(delivery);
         deliveryAttemptRepository.save(attempt);
+
+        if (decision.shouldRetry()) {
+            deliveryMetrics.recordTransitionRetryScheduled();
+
+            log.warn(
+                    "worker delivery completed "
+                            + "workerId={} deliveryId={} eventId={} endpointId={} "
+                            + "attempt={} httpStatus={} decision={} nextAttemptAt={}",
+                    workerId,
+                    delivery.getId(),
+                    delivery.getEventId(),
+                    delivery.getEndpointId(),
+                    attempt.getAttemptNumber(),
+                    result.httpStatus(),
+                    "retry_scheduled",
+                    decision.nextAttemptAt()
+            );
+        } else {
+            deliveryMetrics.recordTransitionFailed();
+
+            log.warn(
+                    "worker delivery completed "
+                            + "workerId={} deliveryId={} eventId={} endpointId={} "
+                            + "attempt={} httpStatus={} decision={}",
+                    workerId,
+                    delivery.getId(),
+                    delivery.getEventId(),
+                    delivery.getEndpointId(),
+                    attempt.getAttemptNumber(),
+                    result.httpStatus(),
+                    "failed"
+            );
+        }
+
         return ProcessResult.failed(delivery.getId());
     }
 }
